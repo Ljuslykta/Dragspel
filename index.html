@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notvisare med Tonarter</title>
+    <title>Notvisare - Dur & Moll</title>
     <style>
         body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
         h1 { color: #333; margin-bottom: 10px; }
         
-        /* Layout */
         .controls { margin-bottom: 20px; background: #fff; padding: 15px; display: inline-block; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         select { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-left: 10px; }
         
@@ -27,19 +26,31 @@
 </head>
 <body>
 
-    <h1>🎵 Notvisare Pro</h1>
+    <h1>🎵 Notvisare (Dur & Moll)</h1>
 
     <div class="controls">
         <label for="keySelect">Välj Tonart:</label>
         <select id="keySelect">
-            <option value="C">C-dur (Inga förtecken)</option>
-            <option value="G">G-dur (1 # - F#)</option>
-            <option value="D">D-dur (2 # - F#, C#)</option>
-            <option value="A">A-dur (3 # - F#, C#, G#)</option>
-            <option value="E">E-dur (4 # - F#, C#, G#, D#)</option>
-            <option value="F">F-dur (1 ♭ - Bb)</option>
-            <option value="Bb">Bb-dur (2 ♭ - Bb, Eb)</option>
-            <option value="Eb">Eb-dur (3 ♭ - Bb, Eb, Ab)</option>
+            <optgroup label="Dur (Major)">
+                <option value="C">C-dur (0)</option>
+                <option value="G">G-dur (1 #)</option>
+                <option value="D">D-dur (2 #)</option>
+                <option value="A">A-dur (3 #)</option>
+                <option value="E">E-dur (4 #)</option>
+                <option value="F">F-dur (1 ♭)</option>
+                <option value="Bb">Bb-dur (2 ♭)</option>
+                <option value="Eb">Eb-dur (3 ♭)</option>
+            </optgroup>
+            <optgroup label="Moll (Minor)">
+                <option value="Am">A-moll (0)</option>
+                <option value="Em">E-moll (1 #)</option>
+                <option value="Bm">B-moll (2 #)</option>
+                <option value="F#m">F#-moll (3 #)</option>
+                <option value="C#m">C#-moll (4 #)</option>
+                <option value="Dm">D-moll (1 ♭)</option>
+                <option value="Gm">G-moll (2 ♭)</option>
+                <option value="Cm">C-moll (3 ♭)</option>
+            </optgroup>
         </select>
     </div>
     
@@ -69,8 +80,11 @@
 
         // --- MUSIKTEORI DATA ---
         
-        // Vilka noter ingår i vilken skala? (Används för att avgöra om #/b/återställningstecken ska visas vid noten)
+        // Här definierar vi vilka noter som ingår i skalan (Naturell moll används för basen).
+        // Om man spelar harmonisk moll (höjd sjua) kommer koden automatiskt sätta ut ett tillfälligt förtecken (#)
+        // eftersom den noten inte finns med i listan nedan. Det blir korrekt notskrift.
         const keyDefinitions = {
+            // DUR
             "C":  { type: "sharp", count: 0, notes: ["C", "D", "E", "F", "G", "A", "B"] },
             "G":  { type: "sharp", count: 1, notes: ["G", "A", "B", "C", "D", "E", "F#"] },
             "D":  { type: "sharp", count: 2, notes: ["D", "E", "F#", "G", "A", "B", "C#"] },
@@ -78,25 +92,25 @@
             "E":  { type: "sharp", count: 4, notes: ["E", "F#", "G#", "A", "B", "C#", "D#"] },
             "F":  { type: "flat",  count: 1, notes: ["F", "G", "A", "Bb", "C", "D", "E"] },
             "Bb": { type: "flat",  count: 2, notes: ["Bb", "C", "D", "Eb", "F", "G", "A"] },
-            "Eb": { type: "flat",  count: 3, notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D"] }
+            "Eb": { type: "flat",  count: 3, notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D"] },
+            
+            // MOLL (Parallelltonarter)
+            "Am": { type: "sharp", count: 0, notes: ["A", "B", "C", "D", "E", "F", "G"] }, // Parallell till C
+            "Em": { type: "sharp", count: 1, notes: ["E", "F#", "G", "A", "B", "C", "D"] }, // Parallell till G
+            "Bm": { type: "sharp", count: 2, notes: ["B", "C#", "D", "E", "F#", "G", "A"] }, // Parallell till D
+            "F#m":{ type: "sharp", count: 3, notes: ["F#", "G#", "A", "B", "C#", "D", "E"] }, // Parallell till A
+            "C#m":{ type: "sharp", count: 4, notes: ["C#", "D#", "E", "F#", "G#", "A", "B"] }, // Parallell till E
+            "Dm": { type: "flat",  count: 1, notes: ["D", "E", "F", "G", "A", "Bb", "C"] }, // Parallell till F
+            "Gm": { type: "flat",  count: 2, notes: ["G", "A", "Bb", "C", "D", "Eb", "F"] }, // Parallell till Bb
+            "Cm": { type: "flat",  count: 3, notes: ["C", "D", "Eb", "F", "G", "Ab", "Bb"] }  // Parallell till Eb
         };
 
-        // Koordinater för var # och b ska ritas i tonarten (relativt mittlinjen B4)
-        // 0 = B4. Positivt = uppåt, Negativt = nedåt. Varje steg är en halv position (linje/mellanrum).
-        const sharpPositions = [4, 1, 5, 2]; // F (topplinje), C, G, D
-        const flatPositions = [0, 3, -1];    // B (mittlinje), E, A
-
-        // Notnamn arrayer
+        const sharpPositions = [4, 1, 5, 2]; // F, C, G, D
+        const flatPositions = [0, 3, -1];    // B, E, A
         const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const flatNotes  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
         
-        // Ordning på "vita tangenter" för höjdberäkning (C, D, E, F, G, A, B)
-        const whiteKeySteps = [0, 2, 4, 5, 7, 9, 11];
-
-        // --- HÄNDELSER ---
-        keySelect.addEventListener('change', (e) => {
-            currentKey = e.target.value;
-        });
+        keySelect.addEventListener('change', (e) => { currentKey = e.target.value; });
 
         document.getElementById('startBtn').addEventListener('click', async () => {
             document.getElementById('startBtn').classList.add('hidden');
@@ -105,198 +119,115 @@
             drawLoop();
         });
 
-        // --- LJUDHANTERING ---
         async function startAudio() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 2048;
-            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 microphone = audioContext.createMediaStreamSource(stream);
                 microphone.connect(analyser);
                 dataArray = new Float32Array(analyser.fftSize);
-            } catch (err) {
-                alert("Kunde inte starta mikrofonen.");
-            }
+            } catch (err) { alert("Mikrofonproblem."); }
         }
 
         function autoCorrelate(buf, sampleRate) {
-            let SIZE = buf.length;
-            let rms = 0;
+            let SIZE = buf.length, rms = 0;
             for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
-            rms = Math.sqrt(rms / SIZE);
-            if (rms < 0.015) return -1; // Brusfilter (höj om det flimrar)
+            if (Math.sqrt(rms / SIZE) < 0.015) return -1;
 
             let r1 = 0, r2 = SIZE - 1, thres = 0.2;
             for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
             for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
-            buf = buf.slice(r1, r2);
-            SIZE = buf.length;
+            buf = buf.slice(r1, r2); SIZE = buf.length;
 
             let c = new Array(SIZE).fill(0);
             for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] += buf[j] * buf[j + i];
-
+            
             let d = 0; while (c[d] > c[d + 1]) d++;
             let maxval = -1, maxpos = -1;
             for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
-            
             return sampleRate / maxpos;
         }
 
         function getNoteInfo(frequency) {
             const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
             const midiNote = Math.round(noteNum) + 69;
-            
-            // Bestäm namn baserat på om tonarten är # eller b
             const keyData = keyDefinitions[currentKey];
-            const useFlats = keyData.type === "flat";
-            const noteList = useFlats ? flatNotes : sharpNotes;
-            
-            const rawNoteName = noteList[midiNote % 12]; // T.ex. "F#" eller "Gb"
+            const noteList = keyData.type === "flat" ? flatNotes : sharpNotes;
+            const rawNoteName = noteList[midiNote % 12];
             const octave = Math.floor(midiNote / 12) - 1;
-
             return { midiNote, rawNoteName, octave };
         }
 
-        // --- RITNING ---
         function drawStaff(settings) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = "#333";
-            ctx.lineWidth = 2;
-            ctx.fillStyle = "#000";
-
+            ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.fillStyle = "#000";
             const { startY, lineSpacing } = settings;
-
-            // Rita 5 linjer
             for (let i = 0; i < 5; i++) {
                 let y = startY + (i * lineSpacing);
-                ctx.beginPath();
-                ctx.moveTo(20, y);
-                ctx.lineTo(480, y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(480, y); ctx.stroke();
             }
-
-            // G-klav
-            ctx.font = "60px serif";
-            ctx.fillText("𝄞", 20, startY + 3 * lineSpacing);
-
-            // Rita Tonart (Fasta förtecken)
+            ctx.font = "60px serif"; ctx.fillText("𝄞", 20, startY + 3 * lineSpacing);
             drawKeySignature(settings);
         }
 
         function drawKeySignature(settings) {
             const keyData = keyDefinitions[currentKey];
             const { startY, lineSpacing } = settings;
-            const middleLineY = startY + 2 * lineSpacing; // B4
+            const middleLineY = startY + 2 * lineSpacing;
             const halfStep = lineSpacing / 2;
-            
-            ctx.font = "24px serif"; // Font för # och b
-            
-            let startX = 60; // Startposition efter G-klav
+            ctx.font = "24px serif";
+            let startX = 60;
 
             if (keyData.type === "sharp") {
                 for(let i=0; i<keyData.count; i++) {
-                    // Hämta position reltivt B-linjen
-                    let pos = sharpPositions[i]; 
-                    // Konvertera till Y (invertera pos eftersom canvas Y ökar nedåt)
-                    let y = middleLineY - (pos * halfStep) + 8; // +8 för att centrera texten
+                    let y = middleLineY - (sharpPositions[i] * halfStep) + 8;
                     ctx.fillText("♯", startX + (i * 15), y);
                 }
             } else if (keyData.type === "flat") {
                 for(let i=0; i<keyData.count; i++) {
-                    let pos = flatPositions[i];
-                    let y = middleLineY - (pos * halfStep) + 8;
+                    let y = middleLineY - (flatPositions[i] * halfStep) + 8;
                     ctx.fillText("♭", startX + (i * 15), y);
                 }
             }
         }
 
         function drawNote(noteInfo, settings) {
-            // Här är "hjärnan" för att visa rätt tecken beroende på tonart
             const keyData = keyDefinitions[currentKey];
-            const scaleNotes = keyData.notes; // T.ex. ["G", "A", "B", "C", "D", "E", "F#"]
+            const scaleNotes = keyData.notes;
             
-            // 1. Vilken "stamton" (bokstav) är det?
-            // Vi måste analysera midi-noten.
-            // Exempel: G-dur (har F#). Vi spelar F# (Midi 66).
-            // RawNoteName = "F#". 
-            // Stamtonen bör vara "F".
-            
-            let baseNoteChar = noteInfo.rawNoteName.charAt(0); // "F" ur "F#"
-            let accidental = noteInfo.rawNoteName.length > 1 ? noteInfo.rawNoteName.charAt(1) : ""; // "#" eller "b" eller ""
+            let baseNoteChar = noteInfo.rawNoteName.charAt(0);
+            let accidental = noteInfo.rawNoteName.length > 1 ? noteInfo.rawNoteName.charAt(1) : "";
 
-            // Specialfall: Om vi är i en b-tonart (F-dur) och pitch detectorn ger A# (Midi 70), 
-            // men F-dur skalan har Bb (också Midi 70).
-            // Då är rawNoteName redan konverterat till "Bb" av getNoteInfo pga flaggan 'useFlats'.
-            
-            // 2. Beräkna visuell höjd (position på notsystemet)
-            // Vi använder stamtonen (C, D, E...) för att hitta raden.
-            // C4 (Midi 60) är basen.
             const baseNotes = ["C", "D", "E", "F", "G", "A", "B"];
             const baseIndex = baseNotes.indexOf(baseNoteChar);
-            
-            // Räkna ut hur många "steg" från C4 vi är
-            // (Oktavskillnad * 7) + indexskillnad
             const octaveDiff = noteInfo.octave - 4;
             const visualSteps = (octaveDiff * 7) + baseIndex;
-            
-            // B4 (Mittenlinjen) är steg 6 (C,D,E,F,G,A,B). 
-            // Vi vill räkna position relativt B4 för att rita på canvas.
             const stepsFromB4 = visualSteps - 6;
             
             const { startY, lineSpacing } = settings;
             const middleLineY = startY + 2 * lineSpacing;
             const halfStep = lineSpacing / 2;
-            
-            // Y-koordinat (inverterad, högre steg = lägre Y)
             const noteY = middleLineY - (stepsFromB4 * halfStep);
 
-            // 3. Bestäm vilket tecken som ska ritas bredvid noten
-            // Vi jämför den spelade noten (noteInfo.rawNoteName) med vad som "förväntas" i tonarten för den stamtonen.
-            
             let symbolToDraw = "";
-            
-            // Hitta vad skalan förväntar sig för denna bokstav (t.ex. för 'F' i G-dur förväntas 'F#')
             const expectedNote = scaleNotes.find(n => n.startsWith(baseNoteChar));
             
-            // Jämför spelad not med förväntad not
-            if (noteInfo.rawNoteName === expectedNote) {
-                // Noten ingår i tonarten (t.ex. F# i G-dur). Inget tecken behövs!
-                symbolToDraw = ""; 
-            } else {
-                // Noten avviker!
-                if (accidental === "") {
-                    // Vi spelar en naturell ton (t.ex. F), men skalan har F#.
-                    // Vi måste visa återställningstecken.
-                    symbolToDraw = "♮";
-                } else if (accidental === "#") {
-                    symbolToDraw = "♯";
-                } else if (accidental === "b") {
-                    symbolToDraw = "♭";
-                }
+            if (noteInfo.rawNoteName !== expectedNote) {
+                if (accidental === "") symbolToDraw = "♮";
+                else if (accidental === "#") symbolToDraw = "♯";
+                else if (accidental === "b") symbolToDraw = "♭";
             }
 
-            // Rita noten
             ctx.beginPath();
             ctx.arc(250, noteY, 10, 0, 2 * Math.PI);
-            ctx.fillStyle = "#000";
-            ctx.fill();
+            ctx.fillStyle = "#000"; ctx.fill();
             
-            // Rita hjälplinjer om det behövs (ovanför/under notsystemet)
-            // Topplinjen är F5 (steg 10 från C4). Bottenlinjen är E4 (steg 2).
-            // B4 är steg 6.
-            // Om visualSteps > 10 (G5 och uppåt) eller < 2 (D4, C4 och nedåt)
-            
-            // Förenklad hjälplinje-logik för C4 (Middle C)
-            if (visualSteps === 0) { // C4
-                ctx.beginPath();
-                ctx.moveTo(230, noteY);
-                ctx.lineTo(270, noteY);
-                ctx.stroke();
+            if (visualSteps === 0) { // C4 Hjälplinje
+                ctx.beginPath(); ctx.moveTo(230, noteY); ctx.lineTo(270, noteY); ctx.stroke();
             }
 
-            // Rita tillfälligt förtecken (symbolToDraw)
             if (symbolToDraw) {
                 ctx.font = "24px serif";
                 ctx.fillText(symbolToDraw, 220, noteY + 8);
@@ -305,8 +236,6 @@
 
         function drawLoop() {
             requestAnimationFrame(drawLoop);
-            
-            // Rita bakgrunden
             const settings = { startY: 100, lineSpacing: 20 };
             drawStaff(settings);
 
@@ -315,12 +244,8 @@
             
             if (frequency > 60 && frequency < 3000) {
                 const info = getNoteInfo(frequency);
-                
-                // Uppdatera texten
-                noteDisplay.innerText = info.rawNoteName;
+                noteDisplay.innerText = info.rawNoteName + info.octave;
                 freqDisplay.innerText = Math.round(frequency) + " Hz";
-
-                // Rita noten på pappret
                 drawNote(info, settings);
             }
         }
