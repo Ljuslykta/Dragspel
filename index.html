@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notvisare - Dur & Moll</title>
+    <title>Notvisare - Alla Tonarter</title>
     <style>
         body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
         h1 { color: #333; margin-bottom: 10px; }
         
         .controls { margin-bottom: 20px; background: #fff; padding: 15px; display: inline-block; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        select { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-left: 10px; }
+        select { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-left: 10px; min-width: 250px; }
         
         #canvas-container { position: relative; display: inline-block; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         canvas { display: block; }
@@ -26,30 +26,67 @@
 </head>
 <body>
 
-    <h1>🎵 Notvisare (Dur & Moll)</h1>
+    <h1>🎵 Notvisare</h1>
 
     <div class="controls">
         <label for="keySelect">Välj Tonart:</label>
         <select id="keySelect">
-            <optgroup label="Dur (Major)">
-                <option value="C">C-dur (0)</option>
-                <option value="G">G-dur (1 #)</option>
-                <option value="D">D-dur (2 #)</option>
-                <option value="A">A-dur (3 #)</option>
-                <option value="E">E-dur (4 #)</option>
-                <option value="F">F-dur (1 ♭)</option>
-                <option value="Bb">Bb-dur (2 ♭)</option>
-                <option value="Eb">Eb-dur (3 ♭)</option>
+            <!-- 5 KORS -->
+            <optgroup label="5 Kors (♯)">
+                <option value="B">B-dur</option>
+                <option value="G#m">G#-moll</option>
             </optgroup>
-            <optgroup label="Moll (Minor)">
-                <option value="Am">A-moll (0)</option>
-                <option value="Em">E-moll (1 #)</option>
-                <option value="Bm">B-moll (2 #)</option>
-                <option value="F#m">F#-moll (3 #)</option>
-                <option value="C#m">C#-moll (4 #)</option>
-                <option value="Dm">D-moll (1 ♭)</option>
-                <option value="Gm">G-moll (2 ♭)</option>
-                <option value="Cm">C-moll (3 ♭)</option>
+            <!-- 4 KORS -->
+            <optgroup label="4 Kors (♯)">
+                <option value="E">E-dur</option>
+                <option value="C#m">C#-moll</option>
+            </optgroup>
+            <!-- 3 KORS -->
+            <optgroup label="3 Kors (♯)">
+                <option value="A">A-dur</option>
+                <option value="F#m">F#-moll</option>
+            </optgroup>
+            <!-- 2 KORS -->
+            <optgroup label="2 Kors (♯)">
+                <option value="D">D-dur</option>
+                <option value="Bm">B-moll</option>
+            </optgroup>
+            <!-- 1 KORS -->
+            <optgroup label="1 Kors (♯)">
+                <option value="G">G-dur</option>
+                <option value="Em">E-moll</option>
+            </optgroup>
+
+            <!-- NATURELL -->
+            <optgroup label="Naturell (Inga förtecken)">
+                <option value="C" selected>C-dur</option>
+                <option value="Am">A-moll</option>
+            </optgroup>
+
+            <!-- 1 BESS -->
+            <optgroup label="1 Bess (♭)">
+                <option value="F">F-dur</option>
+                <option value="Dm">D-moll</option>
+            </optgroup>
+            <!-- 2 BESS -->
+            <optgroup label="2 Bess (♭)">
+                <option value="Bb">Bb-dur</option>
+                <option value="Gm">G-moll</option>
+            </optgroup>
+            <!-- 3 BESS -->
+            <optgroup label="3 Bess (♭)">
+                <option value="Eb">Eb-dur</option>
+                <option value="Cm">C-moll</option>
+            </optgroup>
+            <!-- 4 BESS -->
+            <optgroup label="4 Bess (♭)">
+                <option value="Ab">Ab-dur</option>
+                <option value="Fm">F-moll</option>
+            </optgroup>
+            <!-- 5 BESS -->
+            <optgroup label="5 Bess (♭)">
+                <option value="Db">Db-dur</option>
+                <option value="Bbm">Bb-moll</option>
             </optgroup>
         </select>
     </div>
@@ -78,35 +115,52 @@
         let audioContext, analyser, microphone, dataArray;
         let currentKey = "C";
 
-        // --- MUSIKTEORI DATA ---
-        
-        // Här definierar vi vilka noter som ingår i skalan (Naturell moll används för basen).
-        // Om man spelar harmonisk moll (höjd sjua) kommer koden automatiskt sätta ut ett tillfälligt förtecken (#)
-        // eftersom den noten inte finns med i listan nedan. Det blir korrekt notskrift.
+        // --- DEFINITIONER (Dur & Moll, upp till 5 förtecken) ---
         const keyDefinitions = {
-            // DUR
-            "C":  { type: "sharp", count: 0, notes: ["C", "D", "E", "F", "G", "A", "B"] },
-            "G":  { type: "sharp", count: 1, notes: ["G", "A", "B", "C", "D", "E", "F#"] },
-            "D":  { type: "sharp", count: 2, notes: ["D", "E", "F#", "G", "A", "B", "C#"] },
-            "A":  { type: "sharp", count: 3, notes: ["A", "B", "C#", "D", "E", "F#", "G#"] },
-            "E":  { type: "sharp", count: 4, notes: ["E", "F#", "G#", "A", "B", "C#", "D#"] },
-            "F":  { type: "flat",  count: 1, notes: ["F", "G", "A", "Bb", "C", "D", "E"] },
-            "Bb": { type: "flat",  count: 2, notes: ["Bb", "C", "D", "Eb", "F", "G", "A"] },
-            "Eb": { type: "flat",  count: 3, notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D"] },
+            // SHARPS (#)
+            "B":   { type: "sharp", count: 5, notes: ["B", "C#", "D#", "E", "F#", "G#", "A#"] },
+            "G#m": { type: "sharp", count: 5, notes: ["G#", "A#", "B", "C#", "D#", "E", "F#"] },
             
-            // MOLL (Parallelltonarter)
-            "Am": { type: "sharp", count: 0, notes: ["A", "B", "C", "D", "E", "F", "G"] }, // Parallell till C
-            "Em": { type: "sharp", count: 1, notes: ["E", "F#", "G", "A", "B", "C", "D"] }, // Parallell till G
-            "Bm": { type: "sharp", count: 2, notes: ["B", "C#", "D", "E", "F#", "G", "A"] }, // Parallell till D
-            "F#m":{ type: "sharp", count: 3, notes: ["F#", "G#", "A", "B", "C#", "D", "E"] }, // Parallell till A
-            "C#m":{ type: "sharp", count: 4, notes: ["C#", "D#", "E", "F#", "G#", "A", "B"] }, // Parallell till E
-            "Dm": { type: "flat",  count: 1, notes: ["D", "E", "F", "G", "A", "Bb", "C"] }, // Parallell till F
-            "Gm": { type: "flat",  count: 2, notes: ["G", "A", "Bb", "C", "D", "Eb", "F"] }, // Parallell till Bb
-            "Cm": { type: "flat",  count: 3, notes: ["C", "D", "Eb", "F", "G", "Ab", "Bb"] }  // Parallell till Eb
+            "E":   { type: "sharp", count: 4, notes: ["E", "F#", "G#", "A", "B", "C#", "D#"] },
+            "C#m": { type: "sharp", count: 4, notes: ["C#", "D#", "E", "F#", "G#", "A", "B"] },
+            
+            "A":   { type: "sharp", count: 3, notes: ["A", "B", "C#", "D", "E", "F#", "G#"] },
+            "F#m": { type: "sharp", count: 3, notes: ["F#", "G#", "A", "B", "C#", "D", "E"] },
+            
+            "D":   { type: "sharp", count: 2, notes: ["D", "E", "F#", "G", "A", "B", "C#"] },
+            "Bm":  { type: "sharp", count: 2, notes: ["B", "C#", "D", "E", "F#", "G", "A"] },
+            
+            "G":   { type: "sharp", count: 1, notes: ["G", "A", "B", "C", "D", "E", "F#"] },
+            "Em":  { type: "sharp", count: 1, notes: ["E", "F#", "G", "A", "B", "C", "D"] },
+
+            // NEUTRAL
+            "C":   { type: "sharp", count: 0, notes: ["C", "D", "E", "F", "G", "A", "B"] },
+            "Am":  { type: "sharp", count: 0, notes: ["A", "B", "C", "D", "E", "F", "G"] },
+
+            // FLATS (b)
+            "F":   { type: "flat",  count: 1, notes: ["F", "G", "A", "Bb", "C", "D", "E"] },
+            "Dm":  { type: "flat",  count: 1, notes: ["D", "E", "F", "G", "A", "Bb", "C"] },
+            
+            "Bb":  { type: "flat",  count: 2, notes: ["Bb", "C", "D", "Eb", "F", "G", "A"] },
+            "Gm":  { type: "flat",  count: 2, notes: ["G", "A", "Bb", "C", "D", "Eb", "F"] },
+            
+            "Eb":  { type: "flat",  count: 3, notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D"] },
+            "Cm":  { type: "flat",  count: 3, notes: ["C", "D", "Eb", "F", "G", "Ab", "Bb"] },
+
+            "Ab":  { type: "flat",  count: 4, notes: ["Ab", "Bb", "C", "Db", "Eb", "F", "G"] },
+            "Fm":  { type: "flat",  count: 4, notes: ["F", "G", "Ab", "Bb", "C", "Db", "Eb"] },
+
+            "Db":  { type: "flat",  count: 5, notes: ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"] },
+            "Bbm": { type: "flat",  count: 5, notes: ["Bb", "C", "Db", "Eb", "F", "Gb", "Ab"] }
         };
 
-        const sharpPositions = [4, 1, 5, 2]; // F, C, G, D
-        const flatPositions = [0, 3, -1];    // B, E, A
+        // Visuella positioner för förtecken (Relativt mittenlinjen B4)
+        // 0=B, 1=C (upp), -1=A (ner)
+        // Ordning #: F, C, G, D, A
+        const sharpPositions = [4, 1, 5, 2, -1]; 
+        // Ordning b: B, E, A, D, G
+        const flatPositions = [0, 3, -1, 2, -2];
+
         const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const flatNotes  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
         
@@ -224,8 +278,18 @@
             ctx.arc(250, noteY, 10, 0, 2 * Math.PI);
             ctx.fillStyle = "#000"; ctx.fill();
             
-            if (visualSteps === 0) { // C4 Hjälplinje
-                ctx.beginPath(); ctx.moveTo(230, noteY); ctx.lineTo(270, noteY); ctx.stroke();
+            // Rita hjälplinjer för låga/höga noter (enkel logik)
+            if (visualSteps <= 0) { // C4 eller lägre
+                for(let i=0; i >= visualSteps; i-=2) {
+                     let lineY = middleLineY - ((i-6) * halfStep);
+                     if(i !== visualSteps) { // Rita inte på själva noten om den ligger på linje
+                        // Enbart C4-linje här för enkelhet, utöka för fler linjer
+                     }
+                }
+                // Enkel C4 linje
+                 if(visualSteps === 0 || visualSteps === -1) {
+                    ctx.beginPath(); ctx.moveTo(230, noteY - (visualSteps===-1?halfStep:0)); ctx.lineTo(270, noteY - (visualSteps===-1?halfStep:0)); ctx.stroke();
+                 }
             }
 
             if (symbolToDraw) {
