@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notvisare - Alla Tonarter</title>
+    <title>Notvisare - Hold & Fixad Klav</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
-        h1 { color: #333; margin-bottom: 10px; }
+        body { font-family: 'Times New Roman', serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
+        h1 { color: #333; font-family: sans-serif; margin-bottom: 10px; }
         
-        .controls { margin-bottom: 20px; background: #fff; padding: 15px; display: inline-block; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls { margin-bottom: 20px; background: #fff; padding: 15px; display: inline-block; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: sans-serif; }
         select { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; margin-left: 10px; min-width: 250px; }
         
         #canvas-container { position: relative; display: inline-block; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         canvas { display: block; }
         
-        #note-info { margin-top: 10px; min-height: 60px; }
+        #note-info { margin-top: 10px; min-height: 60px; font-family: sans-serif; }
         #note-name { font-size: 40px; font-weight: bold; color: #d32f2f; display: inline-block; margin-right: 15px; }
         #frequency { color: #666; font-size: 14px; display: inline-block; vertical-align: middle; }
         
-        button#startBtn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; margin: 20px 0; }
+        button#startBtn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; margin: 20px 0; font-family: sans-serif; }
         button#startBtn:hover { background: #0056b3; }
         
         .hidden { display: none; }
@@ -100,7 +100,7 @@
         </div>
         <div id="note-info">
             <span id="note-name">--</span>
-            <span id="frequency">0 Hz</span>
+            <span id="frequency">Spela en ton...</span>
         </div>
     </div>
 
@@ -114,53 +114,36 @@
         
         let audioContext, analyser, microphone, dataArray;
         let currentKey = "C";
+        let lastValidNote = null; // För att komma ihåg senaste noten
 
-        // --- DEFINITIONER (Dur & Moll, upp till 5 förtecken) ---
+        // --- DEFINITIONER ---
         const keyDefinitions = {
-            // SHARPS (#)
             "B":   { type: "sharp", count: 5, notes: ["B", "C#", "D#", "E", "F#", "G#", "A#"] },
             "G#m": { type: "sharp", count: 5, notes: ["G#", "A#", "B", "C#", "D#", "E", "F#"] },
-            
             "E":   { type: "sharp", count: 4, notes: ["E", "F#", "G#", "A", "B", "C#", "D#"] },
             "C#m": { type: "sharp", count: 4, notes: ["C#", "D#", "E", "F#", "G#", "A", "B"] },
-            
             "A":   { type: "sharp", count: 3, notes: ["A", "B", "C#", "D", "E", "F#", "G#"] },
             "F#m": { type: "sharp", count: 3, notes: ["F#", "G#", "A", "B", "C#", "D", "E"] },
-            
             "D":   { type: "sharp", count: 2, notes: ["D", "E", "F#", "G", "A", "B", "C#"] },
             "Bm":  { type: "sharp", count: 2, notes: ["B", "C#", "D", "E", "F#", "G", "A"] },
-            
             "G":   { type: "sharp", count: 1, notes: ["G", "A", "B", "C", "D", "E", "F#"] },
             "Em":  { type: "sharp", count: 1, notes: ["E", "F#", "G", "A", "B", "C", "D"] },
-
-            // NEUTRAL
             "C":   { type: "sharp", count: 0, notes: ["C", "D", "E", "F", "G", "A", "B"] },
             "Am":  { type: "sharp", count: 0, notes: ["A", "B", "C", "D", "E", "F", "G"] },
-
-            // FLATS (b)
             "F":   { type: "flat",  count: 1, notes: ["F", "G", "A", "Bb", "C", "D", "E"] },
             "Dm":  { type: "flat",  count: 1, notes: ["D", "E", "F", "G", "A", "Bb", "C"] },
-            
             "Bb":  { type: "flat",  count: 2, notes: ["Bb", "C", "D", "Eb", "F", "G", "A"] },
             "Gm":  { type: "flat",  count: 2, notes: ["G", "A", "Bb", "C", "D", "Eb", "F"] },
-            
             "Eb":  { type: "flat",  count: 3, notes: ["Eb", "F", "G", "Ab", "Bb", "C", "D"] },
             "Cm":  { type: "flat",  count: 3, notes: ["C", "D", "Eb", "F", "G", "Ab", "Bb"] },
-
             "Ab":  { type: "flat",  count: 4, notes: ["Ab", "Bb", "C", "Db", "Eb", "F", "G"] },
             "Fm":  { type: "flat",  count: 4, notes: ["F", "G", "Ab", "Bb", "C", "Db", "Eb"] },
-
             "Db":  { type: "flat",  count: 5, notes: ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"] },
             "Bbm": { type: "flat",  count: 5, notes: ["Bb", "C", "Db", "Eb", "F", "Gb", "Ab"] }
         };
 
-        // Visuella positioner för förtecken (Relativt mittenlinjen B4)
-        // 0=B, 1=C (upp), -1=A (ner)
-        // Ordning #: F, C, G, D, A
         const sharpPositions = [4, 1, 5, 2, -1]; 
-        // Ordning b: B, E, A, D, G
         const flatPositions = [0, 3, -1, 2, -2];
-
         const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const flatNotes  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
         
@@ -179,140 +162,4 @@
             analyser.fftSize = 2048;
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                dataArray = new Float32Array(analyser.fftSize);
-            } catch (err) { alert("Mikrofonproblem."); }
-        }
-
-        function autoCorrelate(buf, sampleRate) {
-            let SIZE = buf.length, rms = 0;
-            for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
-            if (Math.sqrt(rms / SIZE) < 0.015) return -1;
-
-            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
-            for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
-            for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
-            buf = buf.slice(r1, r2); SIZE = buf.length;
-
-            let c = new Array(SIZE).fill(0);
-            for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] += buf[j] * buf[j + i];
-            
-            let d = 0; while (c[d] > c[d + 1]) d++;
-            let maxval = -1, maxpos = -1;
-            for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
-            return sampleRate / maxpos;
-        }
-
-        function getNoteInfo(frequency) {
-            const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
-            const midiNote = Math.round(noteNum) + 69;
-            const keyData = keyDefinitions[currentKey];
-            const noteList = keyData.type === "flat" ? flatNotes : sharpNotes;
-            const rawNoteName = noteList[midiNote % 12];
-            const octave = Math.floor(midiNote / 12) - 1;
-            return { midiNote, rawNoteName, octave };
-        }
-
-        function drawStaff(settings) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.fillStyle = "#000";
-            const { startY, lineSpacing } = settings;
-            for (let i = 0; i < 5; i++) {
-                let y = startY + (i * lineSpacing);
-                ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(480, y); ctx.stroke();
-            }
-            ctx.font = "60px serif"; ctx.fillText("𝄞", 20, startY + 3 * lineSpacing);
-            drawKeySignature(settings);
-        }
-
-        function drawKeySignature(settings) {
-            const keyData = keyDefinitions[currentKey];
-            const { startY, lineSpacing } = settings;
-            const middleLineY = startY + 2 * lineSpacing;
-            const halfStep = lineSpacing / 2;
-            ctx.font = "24px serif";
-            let startX = 60;
-
-            if (keyData.type === "sharp") {
-                for(let i=0; i<keyData.count; i++) {
-                    let y = middleLineY - (sharpPositions[i] * halfStep) + 8;
-                    ctx.fillText("♯", startX + (i * 15), y);
-                }
-            } else if (keyData.type === "flat") {
-                for(let i=0; i<keyData.count; i++) {
-                    let y = middleLineY - (flatPositions[i] * halfStep) + 8;
-                    ctx.fillText("♭", startX + (i * 15), y);
-                }
-            }
-        }
-
-        function drawNote(noteInfo, settings) {
-            const keyData = keyDefinitions[currentKey];
-            const scaleNotes = keyData.notes;
-            
-            let baseNoteChar = noteInfo.rawNoteName.charAt(0);
-            let accidental = noteInfo.rawNoteName.length > 1 ? noteInfo.rawNoteName.charAt(1) : "";
-
-            const baseNotes = ["C", "D", "E", "F", "G", "A", "B"];
-            const baseIndex = baseNotes.indexOf(baseNoteChar);
-            const octaveDiff = noteInfo.octave - 4;
-            const visualSteps = (octaveDiff * 7) + baseIndex;
-            const stepsFromB4 = visualSteps - 6;
-            
-            const { startY, lineSpacing } = settings;
-            const middleLineY = startY + 2 * lineSpacing;
-            const halfStep = lineSpacing / 2;
-            const noteY = middleLineY - (stepsFromB4 * halfStep);
-
-            let symbolToDraw = "";
-            const expectedNote = scaleNotes.find(n => n.startsWith(baseNoteChar));
-            
-            if (noteInfo.rawNoteName !== expectedNote) {
-                if (accidental === "") symbolToDraw = "♮";
-                else if (accidental === "#") symbolToDraw = "♯";
-                else if (accidental === "b") symbolToDraw = "♭";
-            }
-
-            ctx.beginPath();
-            ctx.arc(250, noteY, 10, 0, 2 * Math.PI);
-            ctx.fillStyle = "#000"; ctx.fill();
-            
-            // Rita hjälplinjer för låga/höga noter (enkel logik)
-            if (visualSteps <= 0) { // C4 eller lägre
-                for(let i=0; i >= visualSteps; i-=2) {
-                     let lineY = middleLineY - ((i-6) * halfStep);
-                     if(i !== visualSteps) { // Rita inte på själva noten om den ligger på linje
-                        // Enbart C4-linje här för enkelhet, utöka för fler linjer
-                     }
-                }
-                // Enkel C4 linje
-                 if(visualSteps === 0 || visualSteps === -1) {
-                    ctx.beginPath(); ctx.moveTo(230, noteY - (visualSteps===-1?halfStep:0)); ctx.lineTo(270, noteY - (visualSteps===-1?halfStep:0)); ctx.stroke();
-                 }
-            }
-
-            if (symbolToDraw) {
-                ctx.font = "24px serif";
-                ctx.fillText(symbolToDraw, 220, noteY + 8);
-            }
-        }
-
-        function drawLoop() {
-            requestAnimationFrame(drawLoop);
-            const settings = { startY: 100, lineSpacing: 20 };
-            drawStaff(settings);
-
-            analyser.getFloatTimeDomainData(dataArray);
-            let frequency = autoCorrelate(dataArray, audioContext.sampleRate);
-            
-            if (frequency > 60 && frequency < 3000) {
-                const info = getNoteInfo(frequency);
-                noteDisplay.innerText = info.rawNoteName + info.octave;
-                freqDisplay.innerText = Math.round(frequency) + " Hz";
-                drawNote(info, settings);
-            }
-        }
-    </script>
-</body>
-</html>
+                microphone = a
