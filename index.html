@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notvisare - Hold & Fixad Klav</title>
+    <title>Notvisare - Fixad Audio</title>
     <style>
         body { font-family: 'Times New Roman', serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
         h1 { color: #333; font-family: sans-serif; margin-bottom: 10px; }
@@ -18,10 +18,12 @@
         #note-name { font-size: 40px; font-weight: bold; color: #d32f2f; display: inline-block; margin-right: 15px; }
         #frequency { color: #666; font-size: 14px; display: inline-block; vertical-align: middle; }
         
-        button#startBtn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; margin: 20px 0; font-family: sans-serif; }
+        button#startBtn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; margin: 20px 0; font-family: sans-serif; transition: background 0.3s;}
         button#startBtn:hover { background: #0056b3; }
+        button#startBtn:disabled { background: #ccc; cursor: not-allowed; }
         
         .hidden { display: none; }
+        #status-msg { color: #d32f2f; font-weight: bold; font-family: sans-serif; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -93,6 +95,7 @@
     
     <br>
     <button id="startBtn">Starta Mikrofonen</button>
+    <div id="status-msg"></div>
 
     <div id="content" class="hidden">
         <div id="canvas-container">
@@ -100,7 +103,7 @@
         </div>
         <div id="note-info">
             <span id="note-name">--</span>
-            <span id="frequency">Spela en ton...</span>
+            <span id="frequency">Väntar på ljud...</span>
         </div>
     </div>
 
@@ -111,10 +114,13 @@
         const noteDisplay = document.getElementById('note-name');
         const freqDisplay = document.getElementById('frequency');
         const keySelect = document.getElementById('keySelect');
+        const startBtn = document.getElementById('startBtn');
+        const statusMsg = document.getElementById('status-msg');
         
         let audioContext, analyser, microphone, dataArray;
         let currentKey = "C";
-        let lastValidNote = null; // För att komma ihåg senaste noten
+        let lastValidNote = null;
+        let isRunning = false;
 
         // --- DEFINITIONER ---
         const keyDefinitions = {
@@ -149,17 +155,187 @@
         
         keySelect.addEventListener('change', (e) => { currentKey = e.target.value; });
 
-        document.getElementById('startBtn').addEventListener('click', async () => {
-            document.getElementById('startBtn').classList.add('hidden');
-            document.getElementById('content').classList.remove('hidden');
-            await startAudio();
-            drawLoop();
+        // --- STARTA LJUDMOTORN (MED FIX FÖR HÄNGANDE LÄGE) ---
+        startBtn.addEventListener('click', async () => {
+            startBtn.innerText = "Startar...";
+            startBtn.disabled = true;
+
+            try {
+                // 1. Skapa AudioContext
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 2. Kolla om den är "suspended" (vanligt i Chrome) och väck den
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                // 3. Begär mikrofon
+                statusMsg.innerText = "Frågar om mikrofon...";
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 4. Koppla ihop
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                dataArray = new Float32Array(analyser.fftSize);
+
+                // 5. Starta UI
+                startBtn.classList.add('hidden');
+                statusMsg.innerText = "";
+                document.getElementById('content').classList.remove('hidden');
+                isRunning = true;
+                drawLoop();
+
+            } catch (err) {
+                console.error(err);
+                startBtn.disabled = false;
+                startBtn.innerText = "Starta Mikrofonen";
+                
+                if (window.location.protocol === 'file:') {
+                    statusMsg.innerText = "FEL: Du kan inte köra detta direkt från en fil. Du måste använda en lokal server eller GitHub Pages (HTTPS).";
+                } else {
+                    statusMsg.innerText = "Kunde inte starta mikrofonen. Se till att du tryckt 'Tillåt'.";
+                }
+            }
         });
 
-        async function startAudio() {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 2048;
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = a
+        function autoCorrelate(buf, sampleRate) {
+            let SIZE = buf.length, rms = 0;
+            for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+            if (Math.sqrt(rms / SIZE) < 0.015) return -1; // Ljudtröskel
+
+            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+            for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+            for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+            buf = buf.slice(r1, r2); SIZE = buf.length;
+
+            let c = new Array(SIZE).fill(0);
+            for (let i = 0; i < SIZE; i++) for (let j = 0; j < SIZE - i; j++) c[i] += buf[j] * buf[j + i];
+            
+            let d = 0; while (c[d] > c[d + 1]) d++;
+            let maxval = -1, maxpos = -1;
+            for (let i = d; i < SIZE; i++) if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+            return sampleRate / maxpos;
+        }
+
+        function getNoteInfo(frequency) {
+            const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
+            const midiNote = Math.round(noteNum) + 69;
+            const keyData = keyDefinitions[currentKey];
+            const noteList = keyData.type === "flat" ? flatNotes : sharpNotes;
+            const rawNoteName = noteList[midiNote % 12];
+            const octave = Math.floor(midiNote / 12) - 1;
+            return { midiNote, rawNoteName, octave };
+        }
+
+        function drawStaff(settings) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = "#333"; ctx.lineWidth = 2; ctx.fillStyle = "#000";
+            const { startY, lineSpacing } = settings;
+            
+            for (let i = 0; i < 5; i++) {
+                let y = startY + (i * lineSpacing);
+                ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(480, y); ctx.stroke();
+            }
+
+            const bottomLineY = startY + 4 * lineSpacing; 
+            ctx.font = "60px serif"; 
+            ctx.fillText("𝄞", 10, bottomLineY); 
+
+            drawKeySignature(settings);
+        }
+
+        function drawKeySignature(settings) {
+            const keyData = keyDefinitions[currentKey];
+            const { startY, lineSpacing } = settings;
+            const middleLineY = startY + 2 * lineSpacing;
+            const halfStep = lineSpacing / 2;
+            ctx.font = "24px serif";
+            let startX = 60;
+
+            if (keyData.type === "sharp") {
+                for(let i=0; i<keyData.count; i++) {
+                    let y = middleLineY - (sharpPositions[i] * halfStep) + 8;
+                    ctx.fillText("♯", startX + (i * 15), y);
+                }
+            } else if (keyData.type === "flat") {
+                for(let i=0; i<keyData.count; i++) {
+                    let y = middleLineY - (flatPositions[i] * halfStep) + 8;
+                    ctx.fillText("♭", startX + (i * 15), y);
+                }
+            }
+        }
+
+        function drawNote(noteInfo, settings) {
+            const keyData = keyDefinitions[currentKey];
+            const scaleNotes = keyData.notes;
+            
+            let baseNoteChar = noteInfo.rawNoteName.charAt(0);
+            let accidental = noteInfo.rawNoteName.length > 1 ? noteInfo.rawNoteName.charAt(1) : "";
+
+            const baseNotes = ["C", "D", "E", "F", "G", "A", "B"];
+            const baseIndex = baseNotes.indexOf(baseNoteChar);
+            const octaveDiff = noteInfo.octave - 4;
+            const visualSteps = (octaveDiff * 7) + baseIndex;
+            const stepsFromB4 = visualSteps - 6;
+            
+            const { startY, lineSpacing } = settings;
+            const middleLineY = startY + 2 * lineSpacing;
+            const halfStep = lineSpacing / 2;
+            const noteY = middleLineY - (stepsFromB4 * halfStep);
+
+            let symbolToDraw = "";
+            const expectedNote = scaleNotes.find(n => n.startsWith(baseNoteChar));
+            
+            if (noteInfo.rawNoteName !== expectedNote) {
+                if (accidental === "") symbolToDraw = "♮";
+                else if (accidental === "#") symbolToDraw = "♯";
+                else if (accidental === "b") symbolToDraw = "♭";
+            }
+
+            ctx.beginPath();
+            ctx.arc(250, noteY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = "#000"; ctx.fill();
+            
+            if (visualSteps <= 0) { 
+                 if(visualSteps === 0 || visualSteps % 2 === 0) {
+                    let lineY = middleLineY - (stepsFromB4 * halfStep);
+                    ctx.beginPath(); ctx.moveTo(230, lineY); ctx.lineTo(270, lineY); ctx.stroke();
+                 }
+            }
+             if (visualSteps >= 12) { 
+                 if(visualSteps % 2 === 0) {
+                    let lineY = middleLineY - (stepsFromB4 * halfStep);
+                    ctx.beginPath(); ctx.moveTo(230, lineY); ctx.lineTo(270, lineY); ctx.stroke();
+                 }
+            }
+
+            if (symbolToDraw) {
+                ctx.font = "24px serif";
+                ctx.fillText(symbolToDraw, 220, noteY + 8);
+            }
+        }
+
+        function drawLoop() {
+            if(!isRunning) return;
+            requestAnimationFrame(drawLoop);
+            const settings = { startY: 100, lineSpacing: 20 };
+            drawStaff(settings);
+
+            analyser.getFloatTimeDomainData(dataArray);
+            let frequency = autoCorrelate(dataArray, audioContext.sampleRate);
+            
+            if (frequency > 60 && frequency < 3000) {
+                lastValidNote = getNoteInfo(frequency);
+                noteDisplay.innerText = lastValidNote.rawNoteName + lastValidNote.octave;
+                freqDisplay.innerText = Math.round(frequency) + " Hz";
+            }
+
+            if (lastValidNote) {
+                drawNote(lastValidNote, settings);
+            }
+        }
+    </script>
+</body>
+</html>
