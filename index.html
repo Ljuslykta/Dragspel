@@ -246,23 +246,34 @@
             drawKeySignature(settings);
         }
 
-        function drawKeySignature(settings) {
+function drawKeySignature(settings) {
             const keyData = keyDefinitions[currentKey];
             const { startY, lineSpacing } = settings;
-            const middleLineY = startY + 2 * lineSpacing;
-            const halfStep = lineSpacing / 2;
-            ctx.font = "24px serif";
-            let startX = 60;
+            const middleLineY = startY + 2 * lineSpacing; // Mittenlinjen (B)
+            const halfStep = lineSpacing / 2; // Avstånd mellan linje och mellanrum
+            
+            ctx.font = "40px serif"; // Din nya storlek
+            
+            let startX = 70; // Lite mer marginal från G-klaven nu när tecknen är större
+
+            // --- JUSTERINGAR (Tweak dessa om det inte ser perfekt ut) ---
+            // Hur många pixlar ska vi flytta tecknet NER för att centrera det?
+            const sharpYOffset = 14; // Passar ofta bra för # vid 40px
+            const flatYOffset = 13;  // Passar ofta bra för b vid 40px
 
             if (keyData.type === "sharp") {
                 for(let i=0; i<keyData.count; i++) {
-                    let y = middleLineY - (sharpPositions[i] * halfStep) + 8;
-                    ctx.fillText("♯", startX + (i * 15), y);
+                    // Räkna ut exakt position (linje eller mellanrum)
+                    let targetY = middleLineY - (sharpPositions[i] * halfStep);
+                    
+                    // Rita tecknet med justeringen
+                    ctx.fillText("♯", startX + (i * 20), targetY + sharpYOffset);
                 }
             } else if (keyData.type === "flat") {
                 for(let i=0; i<keyData.count; i++) {
-                    let y = middleLineY - (flatPositions[i] * halfStep) + 8;
-                    ctx.fillText("♭", startX + (i * 15), y);
+                    let targetY = middleLineY - (flatPositions[i] * halfStep);
+                    
+                    ctx.fillText("♭", startX + (i * 20), targetY + flatYOffset);
                 }
             }
         }
